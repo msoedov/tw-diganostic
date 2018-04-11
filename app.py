@@ -1,12 +1,12 @@
-import fire
-import yaspin
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from retry import retry
-import requests
-import time
-from collections import namedtuple, defaultdict
-
 import logging
+import time
+from collections import defaultdict, namedtuple
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+
+import fire
+import requests
+import yaspin
+from retry import retry
 
 log = logging.getLogger()
 
@@ -118,7 +118,6 @@ def run(servers_file: str, workers: int = 5):
     Keyword Arguments:
         workers {int} -- number of threads (default: {5})
     """
-
 
     with yaspin.yaspin(text="Checking status", color="cyan") as stage:
         _run(servers_file=servers_file, workers=workers, stage=stage)
