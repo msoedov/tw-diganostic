@@ -37,3 +37,9 @@ docker run -v `pwd`:/app -it cli python app.py --servers-file=...
 docker build -f Dockerfile -t cli .
 docker run -v `pwd`:/app  -it cli python app.py --servers-file=...
 ```
+
+### Run unit tests
+
+```shell
+sh test.sh
+```
