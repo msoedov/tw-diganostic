@@ -1,7 +1,7 @@
 import logging
 import time
 from collections import defaultdict, namedtuple
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 
 import fire
 import requests
@@ -24,18 +24,21 @@ with_retry_policy = retry(
 )
 
 
-class AppStatus(namedtuple("Status", "version, total_cnt, success_cnt")):
+class AppStatus(namedtuple("Status", "name, version, total_cnt, success_cnt")):
     pass
 
 
-class AgregatedStatus(namedtuple("Status", "version, total_cnt, success_cnt")):
+class AgregatedStatus:
+
+    def __init__(self):
+        self.total_cnt: float = 0
+        self.success_cnt: float = 0
 
     @property
     def rate(self) -> float:
-        return self.success_cnt / self.total_cnt if total_cnt > 0 else 1.0
+        return self.success_cnt / self.total_cnt if self.total_cnt > 0 else 1.0
 
-    def add(self, status):
-        self.version = status.version
+    def add(self, status: AppStatus):
         self.total_cnt += status.total_cnt
         self.success_cnt += status.success_cnt
 
@@ -51,15 +54,16 @@ def check_endpoint(
             f"Could not get {host_prefix}.{host_group}  details={r.content[:200]}"
         )
 
-    # Schema
-    # [{"Application":"Cache2","Version":"1.0.1","Uptime":4637719417,
-    # "Request_Count":5194800029,"Error_Count":1042813251,"Success_Count":4151986778},
+    # Response schema
+    # {"Application":"Cache2","Version":"1.0.1","Uptime":4637719417,
+    # "Request_Count":5194800029,"Error_Count":1042813251,"Success_Count":4151986778}
     try:
         p = r.json()
         return AppStatus(
             version=p.get("Version", "Unknown"),
             total_cnt=p.get("Request_Count", 0),
             success_cnt=p.get("Success_Count", 0),
+            name=p.get("Application"),
         ), None
 
     except ValueError:
@@ -68,28 +72,23 @@ def check_endpoint(
         )
 
 
-def _run(servers_file, workers, stage):
-    stage.write("> Reading file")
-
-    with open(servers_file, "r") as fp:
-        data = fp.read()
-    servers = [datum.strip("\t ") for datum in data.split("\n") if datum]
+def _run(servers, workers, stage):
     pool = ThreadPoolExecutor(max_workers=workers)
     stage.write("> Brewing coffee")
     results = []
     for server in servers:
         log.debug("Spawning for %s", server)
-        fut = pool.submit(check_endpoint, (server,))
+        fut = pool.submit(check_endpoint, server)
         results.append(fut)
     stage.write("> Creating  a thread pool")
 
-    group_by_version: {str: AgregatedStatus} = defaultdict(
-        lambda s: AgregatedStatus("", 0, 0)
+    groupped_by_name_and_version: {str: AgregatedStatus} = defaultdict(
+        lambda: AgregatedStatus()
     )
     stage.write("> Processing")
-    for r in results:
+    for fut in results:
         try:
-            status, err = r.result(timeout=60)
+            status, err = fut.result(timeout=60)
         except TimeoutError:
             continue
 
@@ -101,12 +100,14 @@ def _run(servers_file, workers, stage):
             log.error("%s", err)
             continue
 
-        group_by_version[status.version].add(status)
+        groupped_by_name_and_version[f"{status.name}:{status.version}"].add(status)
 
-    print("Version | Success rate")
-    for version, agg in group_by_version.items():
-        print(f"{version} | {agg.rate()}")
     stage.ok("✔")
+    print("Version | Success rate")
+
+    for version, agg in groupped_by_name_and_version.items():
+        print(f"{version} | {agg.rate}")
+    return groupped_by_name_and_version
 
 
 def run(servers_file: str, workers: int = 5):
@@ -120,7 +121,11 @@ def run(servers_file: str, workers: int = 5):
     """
 
     with yaspin.yaspin(text="Checking status", color="cyan") as stage:
-        _run(servers_file=servers_file, workers=workers, stage=stage)
+        stage.write("> Reading file")
+        with open(servers_file, "r") as fp:
+            data = fp.read()
+        servers = [datum.strip("\t ") for datum in data.split("\n") if datum]
+        _run(servers=servers, workers=workers, stage=stage)
     return
 
 
