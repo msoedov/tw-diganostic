@@ -8,4 +8,4 @@ WORKDIR /app
 RUN pip install fire requests retry yaspin
 
 COPY app.py .
-CMD python  app.py
+CMD ["python", "app.py"]

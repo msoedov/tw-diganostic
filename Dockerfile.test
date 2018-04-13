@@ -1,0 +1,10 @@
+
+FROM python:3.6
+
+MAINTAINER Alex Myasoedov <msoedov@gmail.com>
+
+WORKDIR /app
+
+RUN pip install fire requests retry yaspin pytest requests_mock
+
+COPY *.py ./

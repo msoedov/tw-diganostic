@@ -36,6 +36,9 @@ class AgregatedStatus:
 
     @property
     def rate(self) -> float:
+        """
+        Calculate a success rate. Return 1 if no requests were recorded
+        """
         return self.success_cnt / self.total_cnt if self.total_cnt > 0 else 1.0
 
     def add(self, status: AppStatus):

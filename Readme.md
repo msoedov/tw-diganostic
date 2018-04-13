@@ -28,12 +28,12 @@ Usage:       app.py SERVERS_FILE [WORKERS]
 
 ```
 docker build -f Dockerfile.cli -t cli .
-docker run -it -v `pwd`:/app python app.py --servers-file=...
+docker run -v `pwd`:/app -it cli python app.py --servers-file=...
 ```
 
 ### Regular dockerfile
 
 ```
 docker build -f Dockerfile -t cli .
-docker run -it -v `pwd`:/app python app.py --servers-file=...
+docker run -v `pwd`:/app  -it cli python app.py --servers-file=...
 ```
